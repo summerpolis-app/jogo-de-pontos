@@ -836,7 +836,8 @@ function toggleCampos(gId, mId, blockId){
       const cur = Array.isArray(m.camposIds) ? m.camposIds : (m.enCampos ? [1] : []);
       const has = cur.includes(blockId);
       const next = has ? cur.filter(id=>id!==blockId) : [...cur, blockId];
-      return {...m, camposIds: next, enCampos: undefined};
+      const { enCampos, ...rest } = m; // strip legacy field instead of setting it to undefined (Firestore rejects undefined values)
+      return {...rest, camposIds: next};
     })};
   });
   saveGroups();render();
