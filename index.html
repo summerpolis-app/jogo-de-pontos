@@ -391,10 +391,14 @@ function setLive(on){
 }
 
 // Saves groups locally AND syncs to Firestore so every viewer sees updates live
+let _saveGroupsTimer = null;
 function saveGroups(){
   sav('sc_groups', groups);
   if(fsDoc){
-    fsDoc.set({groups, updatedAt: Date.now()}, {merge:true}).catch(e=>console.warn('Firestore write failed', e));
+    clearTimeout(_saveGroupsTimer);
+    _saveGroupsTimer = setTimeout(()=>{
+      fsDoc.set({groups, updatedAt: Date.now()}, {merge:true}).catch(e=>console.warn('Firestore write failed', e));
+    }, 300);
   }
 }
 
@@ -1077,7 +1081,10 @@ if(fsDoc){
   fsDoc.onSnapshot(doc=>{
     if(doc.exists){
       const data = doc.data();
-      if(data && data.groups){
+      // While actively editing (Manage open, editing a name, or points panel open),
+      // don't let a remote snapshot overwrite in-flight local edits.
+      const activelyEditing = (tab===3 && manageOpen) || editingId!==null || editingGroupId!==null || activeUser!==null;
+      if(data && data.groups && !activelyEditing){
         groups = data.groups;
         sav('sc_groups', groups);
       }
@@ -1086,8 +1093,7 @@ if(fsDoc){
       sav('sc_pin', adminPin); sav('sc_email', userEmail);
       if(data && Array.isArray(data.camposBlocks)){ camposBlocks=data.camposBlocks; sav('sc_campos_blocks',camposBlocks); }
       authLoaded = true;
-      // Avoid disrupting the admin while actively editing in Manage
-      if(!(tab===3 && manageOpen)) render();
+      if(!activelyEditing) render();
     } else {
       // First time ever — seed Firestore with initial data
       fsDoc.set({groups, adminPin:null, adminEmail:null, updatedAt: Date.now()});
